@@ -1,7 +1,35 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+const model = genAI.getGenerativeModel({
+  model: 'gemini-2.0-flash',
+  generationConfig: {
+    responseMimeType: 'application/json',
+    responseSchema: {
+      type: SchemaType.OBJECT,
+      properties: {
+        clusters: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              theme:   { type: SchemaType.STRING },
+              count:   { type: SchemaType.INTEGER },
+              indices: { type: SchemaType.ARRAY, items: { type: SchemaType.INTEGER } },
+              insight: { type: SchemaType.STRING },
+              severity: {
+                type: SchemaType.STRING,
+                enum: ['low', 'medium', 'high'],
+              },
+            },
+            required: ['theme', 'count', 'indices', 'insight', 'severity'],
+          },
+        },
+      },
+      required: ['clusters'],
+    },
+  },
+})
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -22,24 +50,19 @@ export default async function handler(req, res) {
 
 Below are recent student complaints (numbered). Group them into 4-8 meaningful thematic clusters that reveal the most impactful campus issues.
 
-For each cluster return:
-- theme: short descriptive label (e.g. "Poor Wi-Fi in Academic Buildings")
+For each cluster:
+- theme: a short descriptive label for the recurring issue
 - count: how many complaints belong to this cluster
-- indices: array of complaint numbers belonging to this cluster (1-based)
+- indices: 1-based complaint numbers in this cluster
 - insight: one actionable sentence describing what the campus can improve
-- severity: "low" | "medium" | "high"
+- severity: how urgently this needs addressing
 
 Complaints:
-${formatted}
-
-Respond ONLY with valid JSON in this exact shape (no markdown fences, no explanation):
-{ "clusters": [ { "theme": "...", "count": 0, "indices": [], "insight": "...", "severity": "..." } ] }`
+${formatted}`
 
   try {
     const result = await model.generateContent(prompt)
-    const raw = result.response.text().trim()
-    const jsonMatch = raw.match(/\{[\s\S]*\}/)
-    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw)
+    const parsed = JSON.parse(result.response.text())
     return res.status(200).json(parsed)
   } catch (err) {
     console.error('cluster error:', err)
