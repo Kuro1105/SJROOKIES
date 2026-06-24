@@ -3,6 +3,7 @@ import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUni
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import ComplaintCard from '../components/ComplaintCard'
+import PhotoGallery from '../components/PhotoGallery'
 
 const CATEGORIES = ['All', '시설', '학사', '행정', '기타']
 const PRIORITIES  = ['All', 'high', 'medium', 'low']
@@ -123,6 +124,9 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
               ))}
             </div>
           )}
+
+          {/* Photos */}
+          <PhotoGallery urls={c.photoURLs} />
 
           {/* Like button */}
           <div className="border-t border-sand-200 pt-4 mt-2 flex items-center justify-between">

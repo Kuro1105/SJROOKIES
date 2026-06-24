@@ -3,6 +3,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, deleteDoc } from 'f
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import ComplaintCard from '../components/ComplaintCard'
+import PhotoGallery from '../components/PhotoGallery'
 import { Link } from 'react-router-dom'
 
 const PRIORITY_DOT = {
@@ -146,6 +147,9 @@ function MyComplaintModal({ complaint: c, onClose, onDelete }) {
               ))}
             </div>
           )}
+
+          {/* Photos */}
+          <PhotoGallery urls={c.photoURLs} />
 
           {/* Delete */}
           <div className="border-t border-sand-200 pt-4 mt-2 flex items-center justify-end gap-3">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   collection,
@@ -84,24 +84,26 @@ export default function Submit() {
   const navigate = useNavigate()
 
   const [form, setForm]         = useState({ title: '', description: '', location: '' })
-  const [photos, setPhotos]     = useState([])
+  const [photos, setPhotos]         = useState([])
   const [isDragging, setIsDragging] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
+  const [inputKey, setInputKey]     = useState(0)
+  const photoInputRef = useRef(null)
   const [status, setStatus]     = useState('idle')
   const [aiResult, setAiResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
 
   function addFiles(files) {
     setPhotos(prev => [...prev, ...Array.from(files)].slice(0, 2))
+    setInputKey(k => k + 1)
   }
 
   function handlePhotos(e) {
     addFiles(e.target.files)
-    e.target.value = ''
   }
 
   function removePhoto(index) {
     setPhotos(prev => prev.filter((_, i) => i !== index))
+    setInputKey(k => k + 1)
   }
 
   function handleDragOver(e) {
@@ -135,64 +137,60 @@ export default function Submit() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setStatus('classifying')
+    setStatus('saving')
     setAiResult(null)
     setErrorMsg('')
 
+    let complaintRef
     try {
-      const classifyRes = await fetch('/api/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: form.title, description: form.description }),
-      })
-      if (!classifyRes.ok) {
-        const body = await classifyRes.json().catch(() => ({}))
-        throw new Error(`Classification failed (${classifyRes.status}): ${body.error ?? 'unknown'}`)
-      }
-      const ai = await classifyRes.json()
-      setAiResult(ai)
-      setStatus('saving')
-
-      const complaintRef = await addDoc(collection(db, 'complaints'), {
+      complaintRef = await addDoc(collection(db, 'complaints'), {
         title:       form.title,
         description: form.description,
         location:    form.location,
         userId:      user.uid,
         status:      'open',
-        category:    ai.category,
-        priority:     ai.priority,
-        basePriority: ai.priority,
-        likeCount:    0,
-        likedBy:      [],
-        sentiment:    ai.sentiment,
-        type:         ai.type,
-        summary:      ai.summary,
-        tags:         ai.tags ?? [],
-        clusterId:    null,
-        photoURLs:    [],
-        createdAt:    serverTimestamp(),
+        likeCount:   0,
+        likedBy:     [],
+        clusterId:   null,
+        photoURLs:   [],
+        createdAt:   serverTimestamp(),
       })
-
-      if (photos.length > 0) {
-        const photoURLs = await uploadPhotos(complaintRef.id)
-        await updateDoc(complaintRef, { photoURLs })
-      }
-
-      // 3. 요청형(actionable)만 임베딩 -> 클러스터 매칭/생성 -> (2건 이상이면) 해결방안 제안
-      if (ai.type === ACTIONABLE_TYPE) {
-        await attachToCluster(complaintRef, form, ai)
-      }
-
-      setStatus('done')
-      setTimeout(() => navigate('/dashboard'), 2000)
     } catch (err) {
       console.error(err)
-      setErrorMsg(err.message ?? 'Unknown error')
+      setErrorMsg(err.message ?? 'Failed to save')
       setStatus('error')
+      return
     }
+
+    navigate('/my-complaints')
+
+    // Run AI + photo upload in background after navigating
+    const capturedPhotos = photos
+    Promise.all([
+      fetch('/api/classify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ title: form.title, description: form.description }),
+      }).then(r => r.ok ? r.json() : null).catch(() => null),
+      capturedPhotos.length > 0 ? uploadPhotos(complaintRef.id) : Promise.resolve([]),
+    ]).then(async ([ai, photoURLs]) => {
+      await updateDoc(complaintRef, {
+        category:     ai?.category    ?? '기타',
+        priority:     ai?.priority    ?? 'medium',
+        basePriority: ai?.priority    ?? 'medium',
+        sentiment:    ai?.sentiment   ?? null,
+        type:         ai?.type        ?? null,
+        summary:      ai?.summary     ?? null,
+        tags:         ai?.tags        ?? [],
+        photoURLs,
+      })
+      if (ai?.type === ACTIONABLE_TYPE) {
+        await attachToCluster(complaintRef, form, ai)
+      }
+    }).catch(err => console.error('Background processing failed:', err))
   }
 
-  const isSubmitting = status === 'classifying' || status === 'saving'
+  const isSubmitting = status === 'saving'
   const inputClass = "w-full border border-sand-300 rounded-xl px-4 py-2.5 text-sm bg-sand-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent placeholder-gray-400"
 
   return (
@@ -253,62 +251,31 @@ export default function Submit() {
               Photos <span className="font-normal text-gray-400">(optional, max 2)</span>
             </label>
 
-            {/* Hidden inputs — triggered by labels, never by .click() */}
-            <input id="photo-gallery" type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
-            <input id="photo-camera"  type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
+            <input
+              ref={photoInputRef}
+              key={inputKey}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handlePhotos}
+            />
 
-            {/* Drop zone */}
-            <div className="relative">
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => photos.length < 2 && setShowMenu(v => !v)}
-                className={`flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl py-7 px-4 transition-colors select-none
-                  ${photos.length >= 2 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-                  ${isDragging ? 'border-brand-500 bg-brand-50' : 'border-sand-300 hover:border-brand-400 hover:bg-sand-50'}`}
-              >
-                <svg className="w-7 h-7 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-sm text-gray-400">
-                  {isDragging ? 'Drop to add' : 'Drag a photo here or tap to choose'}
-                </p>
-              </div>
-
-              {/* Menu — labels directly activate inputs, no JS .click() needed */}
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 bg-white border border-sand-300 rounded-2xl shadow-lg overflow-hidden w-56"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <label
-                      htmlFor="photo-gallery"
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors cursor-pointer"
-                      onClick={() => setShowMenu(false)}
-                    >
-                      <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Choose from library
-                    </label>
-                    <div className="h-px bg-sand-200" />
-                    <label
-                      htmlFor="photo-camera"
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors cursor-pointer"
-                      onClick={() => setShowMenu(false)}
-                    >
-                      <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Take a photo
-                    </label>
-                  </div>
-                </>
-              )}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => photos.length < 2 && photoInputRef.current.click()}
+              className={`flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl py-7 px-4 transition-colors select-none
+                ${photos.length >= 2 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                ${isDragging ? 'border-brand-500 bg-brand-50' : 'border-sand-300 hover:border-brand-400 hover:bg-sand-50'}`}
+            >
+              <svg className="w-7 h-7 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm text-gray-400">
+                {isDragging ? 'Drop to add' : 'Drag or click to add photos'}
+              </p>
             </div>
 
             <p className="text-xs text-gray-300 mt-2">Photos will be visible to everyone who views this report.</p>
@@ -385,9 +352,7 @@ export default function Submit() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
               </svg>
             )}
-            {status === 'classifying' && 'Analyzing with AI…'}
-            {status === 'saving'      && 'Saving report…'}
-            {status === 'done'        && 'Submitted!'}
+            {status === 'saving' ? 'Saving…' : 'Submit Report'}
             {(status === 'idle' || status === 'error') && 'Submit Report'}
           </button>
         </form>
