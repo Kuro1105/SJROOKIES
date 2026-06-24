@@ -90,6 +90,38 @@ function MyComplaintModal({ complaint: c, onClose, onDelete }) {
             )}
           </div>
 
+          {/* Progress bar */}
+          <div className="mb-6">
+            {/* Circles + connectors */}
+            <div className="flex items-center mb-2">
+              {['Submitted', 'Accepted', 'In Progress', 'Done'].map((stage, i, arr) => {
+                const done = i === 0
+                return (
+                  <div key={stage} className="flex items-center flex-1 last:flex-none">
+                    <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center border-2 ${done ? 'bg-green-500 border-green-500' : 'bg-white border-gray-200'}`}>
+                      {done && (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    {i < arr.length - 1 && (
+                      <div className="flex-1 h-0.5 mx-1 bg-gray-200" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            {/* Labels */}
+            <div className="flex">
+              {['Submitted', 'Accepted', 'In Progress', 'Done'].map((stage, i) => (
+                <div key={stage} className="flex-1 last:flex-none last:text-right">
+                  <span className={`text-xs font-medium ${i === 0 ? 'text-green-600' : 'text-gray-300'}`}>{stage}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Description */}
           {c.description && (
             <div className="mb-5">
