@@ -63,7 +63,7 @@ export default function Navbar() {
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#701426' }}>
             <ChatBubbleLogo className="w-5 h-5 text-white" />
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Campus Voice</span>
+          <span className="text-white font-bold text-sm tracking-tight">RookieReports</span>
           {isAdmin && (
             <span className="text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">Admin</span>
           )}

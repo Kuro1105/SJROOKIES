@@ -353,7 +353,6 @@ export default function Submit() {
               </svg>
             )}
             {status === 'saving' ? 'Saving…' : 'Submit Report'}
-            {(status === 'idle' || status === 'error') && 'Submit Report'}
           </button>
         </form>
       </div>
