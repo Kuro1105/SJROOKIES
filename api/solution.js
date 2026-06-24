@@ -1,7 +1,8 @@
 import Groq from 'groq-sdk'
+import { withRetry } from './_retry.js'
 
 export default async function handler(req, res) {
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, fetch })
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -23,11 +24,13 @@ export default async function handler(req, res) {
 ${bulletList}`
 
   try {
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-    })
+    const completion = await withRetry(() =>
+      groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+      })
+    )
     return res.status(200).json({ solution: completion.choices[0].message.content.trim() })
   } catch (err) {
     console.error('solution error:', err)
