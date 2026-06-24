@@ -10,7 +10,8 @@ import {
   where,
   serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { findMatchingCluster, updateCentroid } from '../lib/clustering'
 
@@ -83,9 +84,29 @@ export default function Submit() {
   const navigate = useNavigate()
 
   const [form, setForm]     = useState({ title: '', description: '', location: '' })
+  const [photos, setPhotos] = useState([])
   const [status, setStatus] = useState('idle')
   const [aiResult, setAiResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+
+  function handlePhotos(e) {
+    const files = Array.from(e.target.files)
+    setPhotos(prev => [...prev, ...files].slice(0, 5))
+  }
+
+  function removePhoto(index) {
+    setPhotos(prev => prev.filter((_, i) => i !== index))
+  }
+
+  async function uploadPhotos(complaintId) {
+    const urls = await Promise.all(
+      photos.map(file => {
+        const storageRef = ref(storage, `complaints/${complaintId}/${Date.now()}_${file.name}`)
+        return uploadBytes(storageRef, file).then(snap => getDownloadURL(snap.ref))
+      })
+    )
+    return urls
+  }
 
   function handleChange(e) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
@@ -127,8 +148,14 @@ export default function Submit() {
         summary:      ai.summary,
         tags:         ai.tags ?? [],
         clusterId:    null,
+        photoURLs:    [],
         createdAt:    serverTimestamp(),
       })
+
+      if (photos.length > 0) {
+        const photoURLs = await uploadPhotos(complaintRef.id)
+        await updateDoc(complaintRef, { photoURLs })
+      }
 
       // 3. 요청형(actionable)만 임베딩 -> 클러스터 매칭/생성 -> (2건 이상이면) 해결방안 제안
       if (ai.type === ACTIONABLE_TYPE) {
@@ -197,6 +224,38 @@ export default function Submit() {
               placeholder="Describe the issue in detail — what happened, when, and the impact it had."
               className={`${inputClass} resize-none`}
             />
+          </div>
+
+          {/* Photo upload */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Photos <span className="font-normal text-gray-400">(optional)</span></label>
+            <label className="flex flex-col items-center justify-center w-full border-2 border-dashed border-sand-300 rounded-xl py-6 px-4 cursor-pointer hover:border-brand-400 hover:bg-sand-50 transition-colors">
+              <svg className="w-7 h-7 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm text-gray-400">Click to upload photos <span className="text-gray-300">(max 5)</span></span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+            </label>
+            <p className="text-xs text-gray-300 mt-2">Photos will be visible to everyone who views this report.</p>
+
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {photos.map((file, i) => (
+                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-sand-300 shrink-0">
+                    <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 w-5 h-5 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {aiResult && status !== 'error' && (
