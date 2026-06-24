@@ -3,7 +3,7 @@ import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestor
 import { db } from '../lib/firebase'
 import ComplaintCard from '../components/ComplaintCard'
 
-const CATEGORIES = ['All', 'Facilities & Infrastructure', 'Academic & Teaching', 'Safety & Security', 'IT & Technology', 'Food & Cafeteria', 'Transportation', 'Administration & Bureaucracy', 'Student Services', 'Health & Wellness', 'Other']
+const CATEGORIES = ['All', '시설', '학사', '행정', '기타']
 const PRIORITIES  = ['All', 'high', 'medium', 'low']
 
 export default function Dashboard() {
