@@ -117,6 +117,14 @@ function MyComplaintModal({ complaint: c, onClose, onDelete }) {
 
           {/* Delete */}
           <div className="border-t border-sand-200 pt-4 mt-2 flex items-center justify-end gap-3">
+            {(c.likeCount ?? 0) > 0 && !confirming && (
+              <span className="mr-auto flex items-center gap-1.5 text-xs text-brand-800 font-semibold">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                {c.likeCount} {c.likeCount === 1 ? 'person supports' : 'people support'} this
+              </span>
+            )}
             {confirming ? (
               <>
                 <p className="text-xs text-gray-400 mr-auto">Are you sure? This cannot be undone.</p>
