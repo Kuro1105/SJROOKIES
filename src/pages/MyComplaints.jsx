@@ -172,10 +172,11 @@ export default function MyComplaints() {
 
   const selected = complaints.find(c => c.id === selectedId) ?? null
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!selected) return
-    await deleteDoc(doc(db, 'complaints', selected.id))
+    setComplaints(prev => prev.filter(c => c.id !== selected.id))
     setSelectedId(null)
+    deleteDoc(doc(db, 'complaints', selected.id))
   }
 
   return (
