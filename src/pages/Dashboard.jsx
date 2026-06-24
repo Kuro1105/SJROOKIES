@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUnion, increment } from 'firebase/firestore'
+import { collection, query, orderBy, onSnapshot, limit, doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import ComplaintCard from '../components/ComplaintCard'
@@ -133,10 +133,9 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
             </p>
             <button
               onClick={onLike}
-              disabled={hasLiked}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
                 hasLiked
-                  ? 'bg-brand-800 text-white border-brand-800 cursor-default'
+                  ? 'bg-brand-800 text-white border-brand-800 hover:bg-brand-900'
                   : 'bg-white text-brand-800 border-brand-300 hover:bg-brand-50'
               }`}
             >
@@ -173,13 +172,13 @@ export default function Dashboard() {
 
   async function handleLike() {
     if (!selected || !user) return
-    if ((selected.likedBy ?? []).includes(user.uid)) return
-    const newLikeCount = (selected.likeCount ?? 0) + 1
+    const liked = (selected.likedBy ?? []).includes(user.uid)
+    const newLikeCount = Math.max((selected.likeCount ?? 0) + (liked ? -1 : 1), 0)
     const base = selected.basePriority ?? selected.priority
     const newPriority = computePriority(base, newLikeCount)
     await updateDoc(doc(db, 'complaints', selected.id), {
-      likeCount: increment(1),
-      likedBy:   arrayUnion(user.uid),
+      likeCount: increment(liked ? -1 : 1),
+      likedBy:   liked ? arrayRemove(user.uid) : arrayUnion(user.uid),
       priority:  newPriority,
     })
   }

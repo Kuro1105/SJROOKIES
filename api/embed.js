@@ -1,9 +1,9 @@
-import { HfInference } from '@huggingface/inference'
+import { InferenceClient } from '@huggingface/inference'
 
-const hf = new HfInference(process.env.HF_API_KEY)
 const HF_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
 
 export default async function handler(req, res) {
+  const hf = new InferenceClient(process.env.HF_API_KEY)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

@@ -1,8 +1,7 @@
 import Groq from 'groq-sdk'
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
 export default async function handler(req, res) {
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

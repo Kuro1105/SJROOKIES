@@ -25,10 +25,10 @@ const CLUSTER_ICONS = [
 ]
 
 function ClusterCard({ cluster, index }) {
-  const color  = SEVERITY_COLOR[cluster.severity] ?? '#6366f1'
-  const badge  = SEVERITY_BADGE[cluster.severity] ?? 'bg-violet-100 text-violet-700 border-violet-200'
-  const icon   = CLUSTER_ICONS[index % CLUSTER_ICONS.length]
-  const pct    = Math.min(100, (cluster.count / 30) * 100)
+  const color = SEVERITY_COLOR[cluster.severity] ?? '#6366f1'
+  const badge = SEVERITY_BADGE[cluster.severity] ?? 'bg-violet-100 text-violet-700 border-violet-200'
+  const icon  = CLUSTER_ICONS[index % CLUSTER_ICONS.length]
+  const pct   = Math.min(100, (cluster.count / 30) * 100)
 
   return (
     <div className="bg-white border border-sand-300 rounded-2xl p-5 hover:shadow-sm transition-shadow">
@@ -48,9 +48,7 @@ function ClusterCard({ cluster, index }) {
           </span>
         </div>
       </div>
-
       <p className="text-gray-500 text-xs leading-relaxed mb-4">{cluster.insight}</p>
-
       <div className="h-1.5 bg-sand-200 rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-500"
@@ -61,15 +59,39 @@ function ClusterCard({ cluster, index }) {
   )
 }
 
+function RecommendationCard({ rec, index }) {
+  const badge = SEVERITY_BADGE[rec.priority] ?? 'bg-violet-100 text-violet-700 border-violet-200'
+  return (
+    <div className="bg-white border border-sand-300 rounded-2xl p-5 hover:shadow-sm transition-shadow">
+      <div className="flex items-start gap-4">
+        <div className="w-9 h-9 rounded-xl bg-sand-100 flex items-center justify-center shrink-0 text-base font-extrabold text-brand-800">
+          {index + 1}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <h3 className="font-bold text-gray-900 text-sm leading-snug">{rec.title}</h3>
+            <span className={`shrink-0 text-xs font-medium px-2.5 py-0.5 rounded-full border capitalize ${badge}`}>
+              {rec.priority}
+            </span>
+          </div>
+          <p className="text-gray-500 text-xs leading-relaxed">{rec.description}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Insights() {
-  const [clusters, setClusters]   = useState([])
-  const [chartData, setChartData] = useState([])
-  const [status, setStatus]       = useState('idle')
-  const [lastRun, setLastRun]     = useState(null)
+  const [clusters, setClusters]           = useState([])
+  const [recommendations, setRecommendations] = useState([])
+  const [chartData, setChartData]         = useState([])
+  const [status, setStatus]               = useState('idle')
+  const [lastRun, setLastRun]             = useState(null)
 
   async function runAnalysis() {
     setStatus('loading')
     setClusters([])
+    setRecommendations([])
 
     try {
       const snap = await getDocs(
@@ -85,10 +107,11 @@ export default function Insights() {
       })
       if (!res.ok) throw new Error('Cluster API failed')
 
-      const { clusters: raw } = await res.json()
-      setClusters(raw)
+      const { clusters: raw, recommendations: recs } = await res.json()
+      setClusters(raw ?? [])
+      setRecommendations(recs ?? [])
       setChartData(
-        raw
+        (raw ?? [])
           .sort((a, b) => b.count - a.count)
           .map(c => ({ name: c.theme.length > 28 ? c.theme.slice(0, 28) + '…' : c.theme, count: c.count, severity: c.severity }))
       )
@@ -112,7 +135,7 @@ export default function Insights() {
           <h1 className="text-3xl font-extrabold text-gray-900">Insights</h1>
           <p className="text-gray-400 text-sm mt-1">
             {lastRun
-              ? `Recurring themes across all campus reports, clustered automatically. · ${lastRun.toLocaleTimeString()}`
+              ? `Recurring themes across all campus reports · ${lastRun.toLocaleTimeString()}`
               : 'Recurring themes across all campus reports, clustered automatically.'}
           </p>
         </div>
@@ -134,7 +157,7 @@ export default function Insights() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
           </svg>
-          <p className="text-gray-400 text-sm">Claude is analyzing all reports…</p>
+          <p className="text-gray-400 text-sm">AI is analyzing all reports…</p>
         </div>
       )}
 
@@ -144,31 +167,55 @@ export default function Insights() {
         </div>
       )}
 
-      {status === 'done' && clusters.length > 0 && (
+      {status === 'done' && (
         <>
-          <div className="bg-white border border-sand-300 rounded-2xl p-5 mb-6">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Theme Distribution</p>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} margin={{ left: -10 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e0ddd4', fontSize: '12px', backgroundColor: 'white' }}
-                />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={SEVERITY_COLOR[entry.severity] ?? '#6366f1'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {/* Bar chart */}
+          {chartData.length > 0 && (
+            <div className="bg-white border border-sand-300 rounded-2xl p-5 mb-6">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Theme Distribution</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={chartData} margin={{ left: -10 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #e0ddd4', fontSize: '12px', backgroundColor: 'white' }}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, i) => (
+                      <Cell key={i} fill={SEVERITY_COLOR[entry.severity] ?? '#6366f1'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-          <div className="space-y-3">
-            {clusters.map((cluster, i) => (
-              <ClusterCard key={i} cluster={cluster} index={i} />
-            ))}
-          </div>
+          {/* Clusters */}
+          {clusters.length > 0 && (
+            <>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Common Issues</p>
+              <div className="space-y-3 mb-8">
+                {clusters.map((cluster, i) => (
+                  <ClusterCard key={i} cluster={cluster} index={i} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Recommendations */}
+          {recommendations.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Campus Improvement Recommendations</p>
+                <div className="flex-1 h-px bg-sand-200" />
+              </div>
+              <div className="space-y-3">
+                {recommendations.map((rec, i) => (
+                  <RecommendationCard key={i} rec={rec} index={i} />
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
