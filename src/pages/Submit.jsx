@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   collection,
@@ -90,8 +90,6 @@ export default function Submit() {
   const [status, setStatus]     = useState('idle')
   const [aiResult, setAiResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
-  const galleryRef = useRef(null)
-  const cameraRef  = useRef(null)
 
   function addFiles(files) {
     setPhotos(prev => [...prev, ...Array.from(files)].slice(0, 2))
@@ -255,9 +253,9 @@ export default function Submit() {
               Photos <span className="font-normal text-gray-400">(optional, max 2)</span>
             </label>
 
-            {/* Hidden inputs */}
-            <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
-            <input ref={cameraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
+            {/* Hidden inputs — triggered by labels, never by .click() */}
+            <input id="photo-gallery" type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+            <input id="photo-camera"  type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotos} />
 
             {/* Drop zone */}
             <div className="relative">
@@ -278,33 +276,36 @@ export default function Submit() {
                 </p>
               </div>
 
-              {/* Menu */}
+              {/* Menu — labels directly activate inputs, no JS .click() needed */}
               {showMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 bg-white border border-sand-300 rounded-2xl shadow-lg overflow-hidden w-56">
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors"
-                      onClick={() => { setShowMenu(false); galleryRef.current.click() }}
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 bg-white border border-sand-300 rounded-2xl shadow-lg overflow-hidden w-56"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <label
+                      htmlFor="photo-gallery"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors cursor-pointer"
+                      onClick={() => setShowMenu(false)}
                     >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       Choose from library
-                    </button>
+                    </label>
                     <div className="h-px bg-sand-200" />
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors"
-                      onClick={() => { setShowMenu(false); cameraRef.current.click() }}
+                    <label
+                      htmlFor="photo-camera"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-50 transition-colors cursor-pointer"
+                      onClick={() => setShowMenu(false)}
                     >
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                       Take a photo
-                    </button>
+                    </label>
                   </div>
                 </>
               )}
