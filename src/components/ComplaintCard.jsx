@@ -40,6 +40,7 @@ export default function ComplaintCard({ complaint: c, showUser = true }) {
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
         <span className="bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full">{c.category}</span>
+        {c.type && <span className="bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full">{c.type}</span>}
         {c.location && <span>{c.location}</span>}
         {(c.tags ?? []).map(t => (
           <span key={t} className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">#{t}</span>

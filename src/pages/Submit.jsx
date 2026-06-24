@@ -1,10 +1,76 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp,
+} from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
+import { findMatchingCluster, updateCentroid } from '../lib/clustering'
 
 const LOCATIONS = ['Library', 'Cafeteria', 'Dormitory', 'Lecture Hall', 'Lab', 'Sports Facility', 'Parking', 'Admin Office', 'Other']
+const ACTIONABLE_TYPE = '요청형'
+const MIN_COUNT_FOR_SOLUTION = 2
+
+async function attachToCluster(complaintRef, form, ai) {
+  const embedRes = await fetch('/api/embed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: `${form.title}\n${form.description}` }),
+  })
+  if (!embedRes.ok) throw new Error('Embedding failed')
+  const { embedding } = await embedRes.json()
+
+  const clustersSnap = await getDocs(collection(db, 'clusters'))
+  const clusters = clustersSnap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  const match = findMatchingCluster(embedding, clusters)
+
+  let clusterId
+  let newCount
+  if (match) {
+    newCount = match.complaintCount + 1
+    await updateDoc(doc(db, 'clusters', match.id), {
+      centroidEmbedding: updateCentroid(match.centroidEmbedding, embedding, match.complaintCount),
+      complaintCount: newCount,
+    })
+    clusterId = match.id
+  } else {
+    const newCluster = await addDoc(collection(db, 'clusters'), {
+      label: form.title,
+      centroidEmbedding: embedding,
+      complaintCount: 1,
+      suggestedSolution: null,
+      createdAt: serverTimestamp(),
+    })
+    clusterId = newCluster.id
+    newCount = 1
+  }
+
+  await updateDoc(complaintRef, { clusterId, embedding })
+
+  // 단발성 요구사항에는 해결방안을 만들지 않고, 반복 확인된(2건 이상) 경우에만 제안
+  if (newCount >= MIN_COUNT_FOR_SOLUTION) {
+    const clusterComplaintsSnap = await getDocs(
+      query(collection(db, 'complaints'), where('clusterId', '==', clusterId))
+    )
+    const texts = clusterComplaintsSnap.docs.map((d) => d.data().description)
+    const solutionRes = await fetch('/api/solution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts, count: newCount }),
+    })
+    if (solutionRes.ok) {
+      const { solution } = await solutionRes.json()
+      await updateDoc(doc(db, 'clusters', clusterId), { suggestedSolution: solution })
+    }
+  }
+}
 
 export default function Submit() {
   const { user } = useAuth()
@@ -36,7 +102,7 @@ export default function Submit() {
       setStatus('saving')
 
       // 2. Save to Firestore
-      await addDoc(collection(db, 'complaints'), {
+      const complaintRef = await addDoc(collection(db, 'complaints'), {
         title:       form.title,
         description: form.description,
         location:    form.location,
@@ -47,10 +113,17 @@ export default function Submit() {
         category:    ai.category,
         priority:    ai.priority,
         sentiment:   ai.sentiment,
+        type:        ai.type,
         summary:     ai.summary,
         tags:        ai.tags ?? [],
+        clusterId:   null,
         createdAt:   serverTimestamp(),
       })
+
+      // 3. 요청형(actionable)만 임베딩 -> 클러스터 매칭/생성 -> (2건 이상이면) 해결방안 제안
+      if (ai.type === ACTIONABLE_TYPE) {
+        await attachToCluster(complaintRef, form, ai)
+      }
 
       setStatus('done')
       setTimeout(() => navigate('/dashboard'), 2000)
@@ -119,6 +192,7 @@ export default function Submit() {
             <p className="text-gray-600">{aiResult.summary}</p>
             <div className="flex flex-wrap gap-2">
               <span className="bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full text-xs">{aiResult.category}</span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{aiResult.type}</span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLOR[aiResult.priority]}`}>
                 {aiResult.priority} priority
               </span>
