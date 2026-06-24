@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
