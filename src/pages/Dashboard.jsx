@@ -7,7 +7,6 @@ import PhotoGallery from '../components/PhotoGallery'
 
 const CATEGORIES = ['All', '시설', '학사', '행정', '기타']
 const PRIORITIES  = ['All', 'high', 'medium', 'low']
-
 const PRIORITY_ORDER = ['low', 'medium', 'high']
 
 const PRIORITY_DOT = {
@@ -53,11 +52,8 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
         className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        {/* Top accent bar */}
         <div className="h-1 bg-brand-800 rounded-t-2xl" />
-
         <div className="p-6">
-          {/* Header row */}
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${PRIORITY_DOT[c.priority] ?? 'bg-gray-300'}`} />
@@ -73,34 +69,16 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
             </button>
           </div>
 
-          {/* Meta chips */}
           <div className="flex flex-wrap gap-2 mb-5">
             <span className={`text-xs font-medium px-3 py-1 rounded-full border ${STATUS_BADGE[c.status] ?? 'border-gray-200 text-gray-500 bg-gray-50'}`}>
               {STATUS_LABEL[c.status] ?? c.status}
             </span>
-            {c.category && (
-              <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">
-                {c.category}
-              </span>
-            )}
-            {c.location && (
-              <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">
-                {c.location}
-              </span>
-            )}
-            {c.priority && (
-              <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">
-                {c.priority} priority
-              </span>
-            )}
-            {c.createdAt && (
-              <span className="text-xs text-gray-400 px-3 py-1">
-                {timeAgo(c.createdAt)}
-              </span>
-            )}
+            {c.category && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{c.category}</span>}
+            {c.location && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{c.location}</span>}
+            {c.priority && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{c.priority} priority</span>}
+            {c.createdAt && <span className="text-xs text-gray-400 px-3 py-1">{timeAgo(c.createdAt)}</span>}
           </div>
 
-          {/* Description */}
           {c.description && (
             <div className="mb-5">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</p>
@@ -108,7 +86,6 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
             </div>
           )}
 
-          {/* AI summary */}
           {c.summary && (
             <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3 mb-4">
               <p className="text-xs font-semibold text-brand-700 mb-1">AI Summary</p>
@@ -116,7 +93,6 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
             </div>
           )}
 
-          {/* Tags */}
           {c.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-5">
               {c.tags.map(t => (
@@ -125,10 +101,8 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
             </div>
           )}
 
-          {/* Photos */}
           <PhotoGallery urls={c.photoURLs} />
 
-          {/* Like button */}
           <div className="border-t border-sand-200 pt-4 mt-2 flex items-center justify-between">
             <p className="text-xs text-gray-400">
               {(c.likeCount ?? 0) > 0
@@ -155,21 +129,50 @@ function ComplaintModal({ complaint: c, onClose, onLike, hasLiked }) {
   )
 }
 
+function StatusSection({ title, accent, complaints, onSelect, emptyText }) {
+  const [collapsed, setCollapsed] = useState(false)
+  if (complaints.length === 0) return null
+  return (
+    <div className="mb-8">
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        className="flex items-center gap-2.5 mb-3 group w-full text-left"
+      >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${accent}`} />
+        <span className="text-sm font-bold text-gray-700 uppercase tracking-widest">{title}</span>
+        <span className="text-xs text-gray-400 font-medium">({complaints.length})</span>
+        <svg
+          className={`w-3.5 h-3.5 text-gray-400 ml-auto transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {!collapsed && (
+        <div className="space-y-2.5">
+          {complaints.map(c => (
+            <ComplaintCard key={c.id} complaint={c} showUser={false} onClick={() => onSelect(c.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const { user }                        = useAuth()
-  const [complaints, setComplaints]     = useState([])
-  const [loading, setLoading]           = useState(true)
-  const [catFilter, setCatFilter]       = useState('All')
-  const [priFilter, setPriFilter]       = useState('All')
-  const [selectedId, setSelectedId]     = useState(null)
+  const { user }                    = useAuth()
+  const [complaints, setComplaints] = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [catFilter, setCatFilter]   = useState('All')
+  const [priFilter, setPriFilter]   = useState('All')
+  const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
     const q = query(collection(db, 'complaints'), orderBy('createdAt', 'desc'), limit(100))
-    const unsub = onSnapshot(q, snap => {
+    return onSnapshot(q, snap => {
       setComplaints(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     })
-    return unsub
   }, [])
 
   const selected = complaints.find(c => c.id === selectedId) ?? null
@@ -193,6 +196,10 @@ export default function Dashboard() {
     return true
   })
 
+  const open      = visible.filter(c => c.status === 'open')
+  const reviewing = visible.filter(c => c.status === 'reviewing')
+  const resolved  = visible.filter(c => c.status === 'resolved')
+
   const stats = {
     open:      complaints.filter(c => c.status === 'open').length,
     reviewing: complaints.filter(c => c.status === 'reviewing').length,
@@ -202,7 +209,6 @@ export default function Dashboard() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
 
-      {/* Page header */}
       <div className="mb-8">
         <p className="text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">Live Feed</p>
         <h1 className="text-3xl font-extrabold text-gray-900">Campus reports</h1>
@@ -212,9 +218,9 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
-          { label: 'Open issues',  value: stats.open,      color: 'text-brand-800' },
-          { label: 'In review',    value: stats.reviewing, color: 'text-gray-900' },
-          { label: 'Resolved',     value: stats.resolved,  color: 'text-gray-900' },
+          { label: 'Open issues', value: stats.open,      color: 'text-brand-800' },
+          { label: 'In review',   value: stats.reviewing, color: 'text-amber-600' },
+          { label: 'Resolved',    value: stats.resolved,  color: 'text-green-600' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-sand-300 px-6 py-5">
             <p className={`text-4xl font-extrabold leading-none ${s.color}`}>{s.value}</p>
@@ -224,7 +230,7 @@ export default function Dashboard() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Priority</span>
         {PRIORITIES.map(p => (
           <button
@@ -239,7 +245,6 @@ export default function Dashboard() {
             {p === 'All' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
           </button>
         ))}
-
         <div className="ml-auto">
           <select
             value={catFilter}
@@ -251,25 +256,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* List */}
       {loading ? (
         <div className="text-center py-20 text-gray-400 text-sm">Loading reports…</div>
       ) : visible.length === 0 ? (
         <div className="text-center py-20 text-gray-400 text-sm">No reports match the current filters.</div>
       ) : (
-        <div className="space-y-2.5">
-          {visible.map(c => (
-            <ComplaintCard
-              key={c.id}
-              complaint={c}
-              showUser={false}
-              onClick={() => setSelectedId(c.id)}
-            />
-          ))}
-        </div>
+        <>
+          <StatusSection title="Open"      accent="bg-brand-800" complaints={open}      onSelect={setSelectedId} />
+          <StatusSection title="In Review" accent="bg-amber-400" complaints={reviewing} onSelect={setSelectedId} />
+          <StatusSection title="Resolved"  accent="bg-green-500" complaints={resolved}  onSelect={setSelectedId} />
+        </>
       )}
 
-      {/* Detail modal */}
       {selected && (
         <ComplaintModal
           complaint={selected}

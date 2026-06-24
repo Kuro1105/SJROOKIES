@@ -3,9 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const STUDENT_LINKS = [
-  { to: '/dashboard',     label: 'Dashboard' },
-  { to: '/submit',        label: 'Submit Report' },
-  { to: '/insights',      label: 'Insights' },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/submit',    label: 'Submit Report' },
 ]
 
 const ADMIN_LINKS = [
@@ -107,25 +106,31 @@ export default function Navbar() {
 
           {open && (
             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-sand-300 overflow-hidden">
-              <div className="px-4 py-3 border-b border-sand-200">
-                <p className="text-sm font-semibold text-gray-900">{userProfile?.name ?? 'User'}</p>
-                <p className="text-xs text-gray-400">{userProfile?.studentId} · {userProfile?.department}</p>
-              </div>
-
               {!isAdmin && (
-                <NavLink
-                  to="/my-complaints"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-100 transition-colors"
-                >
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  My reports
-                </NavLink>
+                <>
+                  <NavLink
+                    to="/notifications"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    Notifications
+                  </NavLink>
+                  <NavLink
+                    to="/my-complaints"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-100 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    My reports
+                  </NavLink>
+                  <div className="h-px bg-sand-200" />
+                </>
               )}
-
-              <div className="h-px bg-sand-200" />
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-4 py-3 text-sm w-full text-left transition-colors hover:bg-red-50"

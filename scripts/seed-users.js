@@ -6,7 +6,7 @@
  */
 
 import { initializeApp } from 'firebase/app'
-import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
@@ -77,8 +77,19 @@ async function seed() {
 
   for (const u of USERS) {
     const email = `${u.studentId}@campusvoice.app`
+    let cred
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, u.password)
+      cred = await createUserWithEmailAndPassword(auth, email, u.password)
+    } catch (err) {
+      if (err.code !== 'auth/email-already-in-use') {
+        console.error(`✗  [error  ] ${u.studentId}: ${err.message}`)
+        continue
+      }
+      // Account exists — sign in so we can write the Firestore doc
+      cred = await signInWithEmailAndPassword(auth, email, u.password)
+    }
+
+    try {
       await setDoc(doc(db, 'users', cred.user.uid), {
         studentId:  u.studentId,
         name:       u.name,
@@ -86,16 +97,13 @@ async function seed() {
         department: u.department,
         email,
         createdAt:  serverTimestamp(),
-      })
+      }, { merge: true })
       console.log(`✓  [${u.role.padEnd(7)}] ${u.studentId.padEnd(12)} ${u.name}`)
-      await signOut(auth)
     } catch (err) {
-      if (err.code === 'auth/email-already-in-use') {
-        console.log(`-  [skip   ] ${u.studentId.padEnd(12)} already exists`)
-      } else {
-        console.error(`✗  [error  ] ${u.studentId}: ${err.message}`)
-      }
+      console.error(`✗  [firestore] ${u.studentId}: ${err.message}`)
     }
+
+    await signOut(auth)
   }
 
   console.log('\nDone!\n')

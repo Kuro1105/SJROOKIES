@@ -1,18 +1,16 @@
 import { Fragment, useEffect, useState } from 'react'
 import {
-  collection, query, orderBy, onSnapshot, doc, updateDoc,
+  collection, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
-const CATEGORIES  = ['All', '시설', '학사', '행정', '기타']
-const STATUSES    = ['All', 'open', 'reviewing', 'resolved']
-const PRIORITIES  = ['All', 'high', 'medium', 'low']
-
-const STATUS_OPTIONS = ['open', 'reviewing', 'resolved']
+const CATEGORIES = ['All', '시설', '학사', '행정', '기타']
+const STATUSES   = ['All', 'open', 'reviewing', 'resolved']
+const PRIORITIES = ['All', 'high', 'medium', 'low']
 
 const STATUS_BADGE = {
   open:      'border-brand-300 text-brand-800 bg-brand-50',
-  resolved:  'border-sand-400 text-gray-500 bg-sand-50',
+  resolved:  'border-green-300 text-green-700 bg-green-50',
   reviewing: 'border-amber-300 text-amber-700 bg-amber-50',
 }
 const STATUS_LABEL = { open: 'Open', resolved: 'Resolved', reviewing: 'In review' }
@@ -39,19 +37,172 @@ function timeAgo(ts) {
   return `${Math.floor(s / 86400)}d ago`
 }
 
-function StatusSelect({ value, onChange }) {
+const STATUS_ACTIONS = [
+  { value: 'open',      label: 'Open',      style: 'border-brand-300 text-brand-800 hover:bg-brand-50',   activeStyle: 'bg-brand-800 text-white border-brand-800' },
+  { value: 'reviewing', label: 'In Review', style: 'border-amber-300 text-amber-700 hover:bg-amber-50',  activeStyle: 'bg-amber-500 text-white border-amber-500' },
+  { value: 'resolved',  label: 'Resolved',  style: 'border-green-300 text-green-700 hover:bg-green-50',  activeStyle: 'bg-green-600 text-white border-green-600' },
+]
+
+function AdminComplaintModal({ complaint: c, onClose, onStatusChange }) {
+  const [saving, setSaving] = useState(false)
+
+  async function handleStatus(newStatus) {
+    if (newStatus === c.status) return
+    setSaving(true)
+    await onStatusChange(c.id, newStatus)
+    setSaving(false)
+  }
+
   return (
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      onClick={e => e.stopPropagation()}
-      className="text-xs border rounded-lg px-2 py-1 font-medium focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
-      style={{ borderColor: '#d1c9b8', backgroundColor: '#faf8f3' }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
     >
-      {STATUS_OPTIONS.map(s => (
-        <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-      ))}
-    </select>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="h-1 bg-brand-800 rounded-t-2xl" />
+        <div className="p-6">
+
+          {/* Header */}
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-0.5 ${PRIORITY_DOT[c.priority] ?? 'bg-gray-300'}`} />
+              <h2 className="text-lg font-bold text-gray-900 leading-snug">{c.title}</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="shrink-0 w-7 h-7 rounded-full bg-sand-100 hover:bg-sand-200 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Meta chips */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            <span className={`text-xs font-medium px-3 py-1 rounded-full border ${STATUS_BADGE[c.status] ?? 'border-gray-200 text-gray-500 bg-gray-50'}`}>
+              {STATUS_LABEL[c.status] ?? c.status}
+            </span>
+            {c.category && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{CATEGORY_LABEL[c.category] ?? c.category}</span>}
+            {c.location && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{c.location}</span>}
+            {c.priority && <span className="text-xs font-medium px-3 py-1 rounded-full border border-sand-300 text-gray-500 bg-sand-50">{c.priority} priority</span>}
+            {c.createdAt && <span className="text-xs text-gray-400 px-3 py-1">{timeAgo(c.createdAt)}</span>}
+          </div>
+
+          {/* Description */}
+          {c.description && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.description}</p>
+            </div>
+          )}
+
+          {/* AI summary */}
+          {c.summary && (
+            <div className="bg-brand-50 border border-brand-100 rounded-xl px-4 py-3 mb-4">
+              <p className="text-xs font-semibold text-brand-700 mb-1">AI Summary</p>
+              <p className="text-sm text-gray-600 leading-relaxed">{c.summary}</p>
+            </div>
+          )}
+
+          {/* Tags */}
+          {c.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-5">
+              {c.tags.map(t => (
+                <span key={t} className="bg-sand-100 text-gray-400 px-2 py-0.5 rounded-full text-xs">#{t}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Support count */}
+          {(c.likeCount ?? 0) > 0 && (
+            <div className="flex items-center gap-1.5 mb-5 text-xs text-gray-400">
+              <svg className="w-3.5 h-3.5 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              {c.likeCount} {c.likeCount === 1 ? 'student supports' : 'students support'} this
+            </div>
+          )}
+
+          {/* Status action buttons */}
+          <div className="border-t border-sand-200 pt-4 mt-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Update status</p>
+            <div className="flex gap-2">
+              {STATUS_ACTIONS.map(a => (
+                <button
+                  key={a.value}
+                  disabled={saving}
+                  onClick={() => handleStatus(a.value)}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all disabled:opacity-50 ${
+                    c.status === a.value ? a.activeStyle : a.style
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatusSection({ title, accent, complaints, onSelect }) {
+  const [collapsed, setCollapsed] = useState(false)
+  if (complaints.length === 0) return null
+  return (
+    <div className="mb-8">
+      <button
+        onClick={() => setCollapsed(v => !v)}
+        className="flex items-center gap-2.5 mb-3 w-full text-left"
+      >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${accent}`} />
+        <span className="text-sm font-bold text-gray-700 uppercase tracking-widest">{title}</span>
+        <span className="text-xs text-gray-400 font-medium">({complaints.length})</span>
+        <svg
+          className={`w-3.5 h-3.5 text-gray-400 ml-auto transition-transform ${collapsed ? '-rotate-90' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {!collapsed && (
+        <div className="bg-white border border-sand-300 rounded-2xl overflow-hidden">
+          {complaints.map((c, i) => (
+            <div
+              key={c.id}
+              onClick={() => onSelect(c)}
+              className={`flex items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-sand-50 transition-colors ${i > 0 ? 'border-t border-sand-100' : ''}`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[c.priority] ?? 'bg-gray-300'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">{c.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {CATEGORY_LABEL[c.category] ?? c.category}
+                  {c.location ? ` · ${c.location}` : ''}
+                  {c.createdAt ? ` · ${timeAgo(c.createdAt)}` : ''}
+                </p>
+              </div>
+              {(c.likeCount ?? 0) > 0 && (
+                <span className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
+                  <svg className="w-3 h-3 text-brand-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {c.likeCount}
+                </span>
+              )}
+              <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_BADGE[c.status] ?? 'border-gray-200 text-gray-500 bg-gray-50'}`}>
+                {STATUS_LABEL[c.status] ?? c.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -61,7 +212,7 @@ export default function AdminDashboard() {
   const [filterStat, setFilterStat] = useState('All')
   const [filterPri,  setFilterPri]  = useState('All')
   const [search,     setSearch]     = useState('')
-  const [expanded,   setExpanded]   = useState(null)
+  const [selected,   setSelected]   = useState(null)
 
   useEffect(() => {
     const q = query(collection(db, 'complaints'), orderBy('createdAt', 'desc'))
@@ -70,18 +221,32 @@ export default function AdminDashboard() {
     })
   }, [])
 
+  // Keep modal in sync with live updates
+  useEffect(() => {
+    if (!selected) return
+    const updated = complaints.find(c => c.id === selected.id)
+    if (updated) setSelected(updated)
+  }, [complaints])
+
   async function handleStatusChange(id, newStatus) {
-    await updateDoc(doc(db, 'complaints', id), { status: newStatus })
+    await updateDoc(doc(db, 'complaints', id), {
+      status:          newStatus,
+      statusUpdatedAt: serverTimestamp(),
+    })
   }
 
   const filtered = complaints.filter(c => {
-    if (filterCat  !== 'All' && c.category !== filterCat)   return false
-    if (filterStat !== 'All' && c.status   !== filterStat)  return false
-    if (filterPri  !== 'All' && c.priority !== filterPri)   return false
+    if (filterCat  !== 'All' && c.category !== filterCat)  return false
+    if (filterStat !== 'All' && c.status   !== filterStat) return false
+    if (filterPri  !== 'All' && c.priority !== filterPri)  return false
     if (search && !c.title.toLowerCase().includes(search.toLowerCase()) &&
-                  !c.description.toLowerCase().includes(search.toLowerCase())) return false
+                  !c.description?.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+
+  const open      = filtered.filter(c => c.status === 'open')
+  const reviewing = filtered.filter(c => c.status === 'reviewing')
+  const resolved  = filtered.filter(c => c.status === 'resolved')
 
   const counts = {
     open:      complaints.filter(c => c.status === 'open').length,
@@ -90,25 +255,25 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
+    <div className="max-w-4xl mx-auto px-6 py-10">
 
       {/* Header */}
       <div className="mb-8">
         <p className="text-xs font-bold text-brand-800 uppercase tracking-widest mb-1.5">Admin Panel</p>
         <h1 className="text-3xl font-extrabold text-gray-900">Manage Reports</h1>
-        <p className="text-gray-400 text-sm mt-1">Review and update the status of all submitted reports.</p>
+        <p className="text-gray-400 text-sm mt-1">Click any report to open it and update its status.</p>
       </div>
 
-      {/* Stats row */}
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
-          { label: 'Open',       count: counts.open,      color: '#8B1A2E' },
-          { label: 'In Review',  count: counts.reviewing, color: '#d97706' },
-          { label: 'Resolved',   count: counts.resolved,  color: '#16a34a' },
+          { label: 'Open',      count: counts.open,      color: 'text-brand-800' },
+          { label: 'In Review', count: counts.reviewing, color: 'text-amber-600' },
+          { label: 'Resolved',  count: counts.resolved,  color: 'text-green-600' },
         ].map(s => (
-          <div key={s.label} className="bg-white border border-sand-300 rounded-2xl p-5">
-            <p className="text-3xl font-extrabold" style={{ color: s.color }}>{s.count}</p>
-            <p className="text-sm text-gray-500 mt-1">{s.label}</p>
+          <div key={s.label} className="bg-white border border-sand-300 rounded-2xl px-6 py-5">
+            <p className={`text-4xl font-extrabold leading-none ${s.color}`}>{s.count}</p>
+            <p className="text-sm text-gray-400 mt-2">{s.label}</p>
           </div>
         ))}
       </div>
@@ -122,110 +287,31 @@ export default function AdminDashboard() {
           placeholder="Search reports…"
           className="border border-sand-300 rounded-xl px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 w-56"
         />
-        <FilterBar label="Category" options={CATEGORIES} value={filterCat}  onChange={setFilterCat} />
-        <FilterBar label="Status"   options={STATUSES}   value={filterStat} onChange={setFilterStat} />
-        <FilterBar label="Priority" options={PRIORITIES}  value={filterPri}  onChange={setFilterPri} />
+        <FilterPills label="Category" options={CATEGORIES} value={filterCat}  onChange={setFilterCat} />
+        <FilterPills label="Priority" options={PRIORITIES}  value={filterPri}  onChange={setFilterPri} />
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-sand-300 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-sand-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="text-left px-5 py-3 font-semibold">Report</th>
-                <th className="text-left px-4 py-3 font-semibold">Category</th>
-                <th className="text-left px-4 py-3 font-semibold">Priority</th>
-                <th className="text-left px-4 py-3 font-semibold">Status</th>
-                <th className="text-left px-4 py-3 font-semibold">Submitted</th>
-                <th className="text-left px-4 py-3 font-semibold">Votes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">No reports found.</td>
-                </tr>
-              )}
-              {filtered.map(c => (
-                <Fragment key={c.id}>
-                  <tr
-                    className="border-b border-sand-100 hover:bg-sand-50 cursor-pointer transition-colors"
-                    onClick={() => setExpanded(expanded === c.id ? null : c.id)}
-                  >
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-gray-900 line-clamp-1">{c.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{c.location}</p>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="text-xs font-medium text-gray-600 bg-sand-100 px-2 py-0.5 rounded-full">
-                        {CATEGORY_LABEL[c.category] ?? c.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <span className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${PRIORITY_DOT[c.priority]}`} />
-                        <span className="capitalize text-gray-700">{c.priority}</span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <StatusSelect value={c.status} onChange={v => handleStatusChange(c.id, v)} />
-                    </td>
-                    <td className="px-4 py-3.5 text-gray-400 whitespace-nowrap">
-                      {timeAgo(c.createdAt)}
-                    </td>
-                    <td className="px-4 py-3.5 text-gray-500">
-                      {c.likeCount ?? 0}
-                    </td>
-                  </tr>
+      {/* Sections */}
+      <StatusSection title="Open"      accent="bg-brand-800" complaints={open}      onSelect={setSelected} />
+      <StatusSection title="In Review" accent="bg-amber-400" complaints={reviewing} onSelect={setSelected} />
+      <StatusSection title="Resolved"  accent="bg-green-500" complaints={resolved}  onSelect={setSelected} />
 
-                  {expanded === c.id && (
-                    <tr className="bg-sand-50">
-                      <td colSpan={6} className="px-5 py-4">
-                        <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Description</p>
-                            <p className="text-sm text-gray-700 leading-relaxed">{c.description}</p>
-                          </div>
-                          <div className="space-y-3">
-                            {c.summary && (
-                              <div>
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">AI Summary</p>
-                                <p className="text-sm text-gray-700">{c.summary}</p>
-                              </div>
-                            )}
-                            {c.tags?.length > 0 && (
-                              <div>
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Tags</p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {c.tags.map(t => (
-                                    <span key={t} className="text-xs bg-white border border-sand-300 rounded-full px-2 py-0.5 text-gray-500">{t}</span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Type / Sentiment</p>
-                              <p className="text-sm text-gray-600">{c.type} · {c.sentiment}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {filtered.length === 0 && (
+        <p className="text-center text-gray-400 py-16">No reports match the current filters.</p>
+      )}
 
-      <p className="text-center text-xs text-gray-400 mt-4">{filtered.length} of {complaints.length} reports</p>
+      {selected && (
+        <AdminComplaintModal
+          complaint={selected}
+          onClose={() => setSelected(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   )
 }
 
-function FilterBar({ label, options, value, onChange }) {
+function FilterPills({ label, options, value, onChange }) {
   return (
     <div className="flex items-center gap-1.5 bg-white border border-sand-300 rounded-xl px-3 py-1.5">
       <span className="text-xs text-gray-400 font-medium">{label}:</span>
@@ -237,7 +323,7 @@ function FilterBar({ label, options, value, onChange }) {
             value === o ? 'bg-brand-800 text-white' : 'text-gray-500 hover:bg-sand-100'
           }`}
         >
-          {o === 'All' ? 'All' : o}
+          {o}
         </button>
       ))}
     </div>
