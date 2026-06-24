@@ -8,6 +8,7 @@ import { join, dirname } from 'path'
 import classifyHandler from './api/classify.js'
 import embedHandler from './api/embed.js'
 import solutionHandler from './api/solution.js'
+import clusterHandler from './api/cluster.js'
 
 const app = express()
 app.use(express.json())
@@ -15,6 +16,7 @@ app.use(express.json())
 app.post('/api/classify', classifyHandler)
 app.post('/api/embed', embedHandler)
 app.post('/api/solution', solutionHandler)
+app.post('/api/cluster', clusterHandler)
 
 if (process.env.NODE_ENV === 'production') {
   const __dirname = dirname(fileURLToPath(import.meta.url))
