@@ -1,7 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -25,10 +24,14 @@ export default async function handler(req, res) {
 ${bulletList}`
 
   try {
-    const result = await model.generateContent(prompt)
-    return res.status(200).json({ solution: result.response.text().trim() })
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+    })
+    return res.status(200).json({ solution: completion.choices[0].message.content.trim() })
   } catch (err) {
     console.error('solution error:', err)
-    return res.status(500).json({ error: 'AI solution suggestion failed' })
+    return res.status(500).json({ error: err?.message ?? 'AI solution suggestion failed' })
   }
 }

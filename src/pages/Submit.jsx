@@ -85,6 +85,7 @@ export default function Submit() {
   const [form, setForm]     = useState({ title: '', description: '', location: '' })
   const [status, setStatus] = useState('idle')
   const [aiResult, setAiResult] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
 
   function handleChange(e) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
@@ -94,6 +95,7 @@ export default function Submit() {
     e.preventDefault()
     setStatus('classifying')
     setAiResult(null)
+    setErrorMsg('')
 
     try {
       const classifyRes = await fetch('/api/classify', {
@@ -101,7 +103,10 @@ export default function Submit() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: form.title, description: form.description }),
       })
-      if (!classifyRes.ok) throw new Error('Classification failed')
+      if (!classifyRes.ok) {
+        const body = await classifyRes.json().catch(() => ({}))
+        throw new Error(`Classification failed (${classifyRes.status}): ${body.error ?? 'unknown'}`)
+      }
       const ai = await classifyRes.json()
       setAiResult(ai)
       setStatus('saving')
@@ -133,6 +138,7 @@ export default function Submit() {
       setTimeout(() => navigate('/dashboard'), 2000)
     } catch (err) {
       console.error(err)
+      setErrorMsg(err.message ?? 'Unknown error')
       setStatus('error')
     }
   }
@@ -227,8 +233,9 @@ export default function Submit() {
           )}
 
           {status === 'error' && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm text-center">
-              Something went wrong. Please try again.
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+              <p className="font-semibold">Something went wrong. Please try again.</p>
+              {errorMsg && <p className="mt-1 text-xs opacity-80 break-all">{errorMsg}</p>}
             </div>
           )}
 

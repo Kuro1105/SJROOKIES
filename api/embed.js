@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { HfInference } from '@huggingface/inference'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
+const hf = new HfInference(process.env.HF_API_KEY)
+const HF_MODEL = 'sentence-transformers/all-MiniLM-L6-v2'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -14,10 +14,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await model.embedContent(text)
-    return res.status(200).json({ embedding: result.embedding.values })
+    const result = await hf.featureExtraction({
+      model: HF_MODEL,
+      inputs: text,
+    })
+    // featureExtraction returns number[][] for a single string — take the first row
+    const embedding = Array.isArray(result[0]) ? result[0] : result
+    return res.status(200).json({ embedding })
   } catch (err) {
     console.error('embed error:', err)
-    return res.status(500).json({ error: 'AI embedding failed' })
+    return res.status(500).json({ error: err?.message ?? 'AI embedding failed' })
   }
 }
