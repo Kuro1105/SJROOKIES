@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
-const links = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/submit',    label: 'Submit Report' },
-  { to: '/insights',  label: 'Insights' },
+const STUDENT_LINKS = [
+  { to: '/dashboard',     label: 'Dashboard' },
+  { to: '/submit',        label: 'Submit Report' },
+  { to: '/insights',      label: 'Insights' },
+]
+
+const ADMIN_LINKS = [
+  { to: '/admin',          label: 'Manage Reports' },
+  { to: '/admin/insights', label: 'Insights' },
 ]
 
 function ChatBubbleLogo({ className = 'w-5 h-5' }) {
@@ -25,7 +30,7 @@ function ChatBubbleLogo({ className = 'w-5 h-5' }) {
 export { ChatBubbleLogo }
 
 export default function Navbar() {
-  const { user, logout } = useAuth()
+  const { user, userProfile, logout } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -44,8 +49,11 @@ export default function Navbar() {
     navigate('/login')
   }
 
-  const initial  = user?.displayName?.[0] ?? user?.email?.[0] ?? '?'
-  const firstName = user?.displayName?.split(' ')[0] ?? 'You'
+  const isAdmin   = userProfile?.role === 'admin'
+  const links     = isAdmin ? ADMIN_LINKS : STUDENT_LINKS
+  const name      = userProfile?.name ?? user?.email ?? 'You'
+  const firstName = name.split(' ')[0]
+  const initial   = firstName[0]?.toUpperCase() ?? '?'
 
   return (
     <nav style={{ backgroundColor: '#8B1A2E' }} className="sticky top-0 z-20 shadow-sm">
@@ -57,14 +65,18 @@ export default function Navbar() {
             <ChatBubbleLogo className="w-5 h-5 text-white" />
           </div>
           <span className="text-white font-bold text-sm tracking-tight">Campus Voice</span>
+          {isAdmin && (
+            <span className="text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">Admin</span>
+          )}
         </div>
 
-        {/* Flat nav links */}
+        {/* Nav links */}
         <div className="flex items-center gap-1 flex-1">
           {links.map(l => (
             <NavLink
               key={l.to}
               to={l.to}
+              end={l.to === '/admin'}
               className={({ isActive }) =>
                 `px-3 py-1 text-xs font-semibold uppercase tracking-widest transition-all ${
                   isActive
@@ -84,13 +96,9 @@ export default function Navbar() {
             onClick={() => setOpen(v => !v)}
             className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition-all hover:bg-white/10"
           >
-            {user?.photoURL ? (
-              <img src={user.photoURL} className="w-7 h-7 rounded-full" alt="" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">
-                {initial.toUpperCase()}
-              </div>
-            )}
+            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold">
+              {initial}
+            </div>
             <span className="text-white text-sm font-medium">{firstName}</span>
             <svg className={`w-3.5 h-3.5 text-white/60 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -98,17 +106,25 @@ export default function Navbar() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-sand-300 overflow-hidden">
-              <NavLink
-                to="/my-complaints"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-100 transition-colors"
-              >
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                My reports
-              </NavLink>
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-sand-300 overflow-hidden">
+              <div className="px-4 py-3 border-b border-sand-200">
+                <p className="text-sm font-semibold text-gray-900">{userProfile?.name ?? 'User'}</p>
+                <p className="text-xs text-gray-400">{userProfile?.studentId} · {userProfile?.department}</p>
+              </div>
+
+              {!isAdmin && (
+                <NavLink
+                  to="/my-complaints"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-sand-100 transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  My reports
+                </NavLink>
+              )}
+
               <div className="h-px bg-sand-200" />
               <button
                 onClick={handleLogout}

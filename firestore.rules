@@ -2,24 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /complaints/{complaintId} {
-      // Anyone can read complaints
-      allow read: if true;
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
 
-      // Any signed-in user can submit a complaint
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow list:   if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if true;
       allow create: if request.auth != null;
 
-      // Owner can update anything; others can only like (likeCount + likedBy) and only once
+      // Admin can update anything; owner can update own; any authenticated user can like
       allow update: if request.auth != null && (
-        request.auth.uid == resource.data.userId
-        ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'likedBy'])
-        )
+        isAdmin()
+        || request.auth.uid == resource.data.userId
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'likedBy'])
       );
 
-      // Only the owner can delete
-      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Admin or owner can delete
+      allow delete: if request.auth != null && (
+        isAdmin() || request.auth.uid == resource.data.userId
+      );
     }
 
     match /clusters/{clusterId} {

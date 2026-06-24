@@ -9,7 +9,8 @@
     "build": "vite build",
     "start": "NODE_ENV=production node server.js",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "seed": "node scripts/seed-users.js"
   },
   "dependencies": {
     "@fontsource/geist-sans": "^5.2.5",
