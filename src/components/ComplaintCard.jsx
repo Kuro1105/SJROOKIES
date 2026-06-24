@@ -25,9 +25,12 @@ function timeAgo(ts) {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
-export default function ComplaintCard({ complaint: c, showUser = true }) {
+export default function ComplaintCard({ complaint: c, showUser = true, onClick }) {
   return (
-    <div className="bg-white rounded-2xl border border-sand-300 px-5 py-4 flex items-center gap-4 hover:shadow-sm transition-shadow">
+    <div
+      className={`bg-white rounded-2xl border border-sand-300 px-5 py-4 flex items-center gap-4 hover:shadow-sm transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
 
       {/* Priority dot */}
       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${PRIORITY_DOT[c.priority] ?? 'bg-gray-300'}`} />
